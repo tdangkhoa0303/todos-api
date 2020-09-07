@@ -4,6 +4,7 @@ const Token = require("../../models/token.model");
 
 const catchAsync = require("../../utils/catchAsync");
 const { generateToken, verifyToken } = require("../../helpers/jwt.helper");
+const AppError = require("../../utils/appError");
 
 const accessTokenLife = process.env.ACCESS_TOKEN_LIFE;
 const refreshTokenLife = process.env.REFRESH_TOKEN_LIFE;
@@ -31,18 +32,22 @@ module.exports.logIn = catchAsync(async (req, res, next) => {
 
   const user = await User.findOne({ email });
   if (!user)
-    return res.status(403).json({
-      status: "fail",
-      message:
+    return next(
+      new AppError(
         "The email address or password is incorrect. Please retry again.",
-    });
+        403
+      )
+    );
+
   const checkPassword = await bcrypt.compare(password, user.password);
   if (!checkPassword)
-    return res.status(403).json({
-      status: "fail",
-      message:
+    return next(
+      new AppError(
         "The email address or password is incorrect. Please retry again.",
-    });
+        403
+      )
+    );
+
   const accessToken = await generateToken(
     user,
     accessTokenSecret,
@@ -101,5 +106,5 @@ module.exports.refreshToken = catchAsync(async (req, res, next) => {
       status: "success",
       token: accessToken,
     });
-  } else res.status(403).json({ status: "fail", message: "No token provided" });
+  } else next(new AppError("No token provided.", 403));
 });

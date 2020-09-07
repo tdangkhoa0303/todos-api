@@ -22,6 +22,5 @@ module.exports = (err, req, res, next) => {
 
   let error = { ...err };
   if (error.name === "CastError") error = handleCastErrorDB(error);
-  console.log(error);
   sendErrorProd(error, res);
 };
