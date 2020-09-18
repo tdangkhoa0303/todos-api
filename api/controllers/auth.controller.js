@@ -3,7 +3,7 @@ const User = require("../../models/user.model");
 const Token = require("../../models/token.model");
 
 const catchAsync = require("../../utils/catchAsync");
-const { generateToken, verifyToken } = require("../../helpers/jwt.helper");
+const { generateToken, verifyToken } = require("../../utils/auth.utils");
 const AppError = require("../../utils/appError");
 
 const accessTokenLife = process.env.ACCESS_TOKEN_LIFE;
@@ -18,59 +18,32 @@ module.exports.signUp = catchAsync(async (req, res, next) => {
   password = await bcrypt.hash(password, saltRounds);
   const user = await User.create({ email, name, password });
 
-  user.password = undefined;
   res.status(201).json({
     status: "success",
     data: {
-      user,
+      user: basicDetails(user),
     },
   });
 });
 
 module.exports.logIn = catchAsync(async (req, res, next) => {
-  const { email, password } = req.body;
+  try {
+    const { email, password } = req.body;
 
-  const user = await User.findOne({ email });
-  if (!user)
-    return next(
-      new AppError(
-        "The email address or password is incorrect. Please retry again.",
-        403
-      )
-    );
+    let user = await User.findOne({ email });
 
-  const checkPassword = await bcrypt.compare(password, user.password);
-  if (!checkPassword)
-    return next(
-      new AppError(
-        "The email address or password is incorrect. Please retry again.",
-        403
-      )
-    );
-
-  const accessToken = await generateToken(
-    user,
-    accessTokenSecret,
-    accessTokenLife
-  );
-  const refreshToken = await generateToken(
-    user,
-    refreshTokenSecret,
-    refreshTokenLife
-  );
-
-  await Token.create({ refreshToken, accessToken });
-
-  res.cookie("refreshToken", refreshToken, {
-    signed: true,
-    expries: new Date(Date.now() + process.env.REFRESH_TOKEN_LIFE),
-    // httpOnly: true,
-    // secure: true,
-  });
-  res.status(200).json({
-    status: "success",
-    token: accessToken,
-  });
+    if (!user || !(await bcrypt.compare(password, user.password)))
+      return next(
+        new AppError(
+          "The email address or password is incorrect. Please retry again.",
+          403
+        )
+      );
+    res.cookie("asd", "adsdsa");
+    setToken(res, user);
+  } catch (err) {
+    console.log(err);
+  }
 });
 
 module.exports.refreshToken = catchAsync(async (req, res, next) => {
@@ -83,28 +56,43 @@ module.exports.refreshToken = catchAsync(async (req, res, next) => {
 
     await Token.findOneAndRemove({ refreshToken });
 
-    const accessToken = await generateToken(
-      data,
-      accessTokenSecret,
-      accessTokenLife
-    );
-    refreshToken = await generateToken(
-      data,
-      refreshTokenSecret,
-      refreshTokenLife
-    );
-
-    await Token.create({ accessToken, refreshToken });
-
-    res.cookie("refreshToken", refreshToken, {
-      signed: true,
-      expries: new Date(Date.now() + process.env.REFRESH_TOKEN_LIFE),
-      // httpOnly: true,
-      // secure: true,
-    });
-    res.status(200).json({
-      status: "success",
-      token: accessToken,
-    });
+    setToken(res, data);
   } else next(new AppError("No token provided.", 403));
 });
+
+const setToken = async (res, user) => {
+  const accessToken = await generateToken(
+    user,
+    accessTokenSecret,
+    accessTokenLife
+  );
+
+  const refreshToken = await generateToken(
+    user,
+    refreshTokenSecret,
+    refreshTokenLife
+  );
+
+  await Token.create({ refreshToken, accessToken });
+
+  const cookieOptions = {
+    httpOnly: true,
+    // secure: true,
+    signed: true,
+    expries: new Date(Date.now() + process.env.REFRESH_TOKEN_LIFE),
+  };
+
+  res.cookie("refreshToken", refreshToken, cookieOptions);
+  res.status(200).json({
+    status: "success",
+    user: {
+      ...basicDetails(user),
+      token: accessToken,
+    },
+  });
+};
+
+const basicDetails = (user) => {
+  const { _id, name, email, avatarUrl } = user;
+  return { _id, name, email, avatarUrl };
+};

@@ -41,7 +41,7 @@ mongoose.connect(process.env.MONGO_URL, {
   dbName: "todoAPI",
 });
 
-app.use(cors());
+app.use(cors({ origin: "http://localhost:3000", credentials: true }));
 
 // Body parser
 app.use(bodyParser.urlencoded({ extended: true }));

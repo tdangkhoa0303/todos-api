@@ -13,7 +13,9 @@ const tokenSchema = new mongoose.Schema({
   },
   createdAt: {
     type: Date,
-    expires: process.env.REFRESH_TOKEN_LIFE,
+    index: {
+      expires: process.env.REFRESH_TOKEN_LIFE,
+    },
     default: Date.now(),
   },
 });
